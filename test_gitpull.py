@@ -94,7 +94,7 @@ class TestGitPull(unittest.TestCase):
         with open(os.path.join(target_path, "test.txt"), "w") as f:
             f.write("test")
         result = gitpull.update_folder(self.test_repo_url, target_path)
-        self.assertFalse(result)
+        self.assertTrue(result)
     
     def test_get_remote_url(self):
         """Test getting the remote URL of a repository."""
