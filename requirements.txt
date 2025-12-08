@@ -1,3 +1,3 @@
-#-e git+https://github.com/gutenbergtools/gitpull.git
+-e git+https://github.com/gutenbergtools/gitpull.git
 
 
