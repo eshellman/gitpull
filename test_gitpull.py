@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for pglaf-gitpull
+Tests for gitpull
 
 Run with: python3 test_gitpull.py
 """
