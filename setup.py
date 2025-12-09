@@ -13,7 +13,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/gutenbergtools/gitpull",
-    py_modules=["gitpull"],
+    py_modules=["gitpull", "puller"],
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
@@ -30,6 +30,7 @@ setup(
     entry_points={
         "console_scripts": [
             "gitpull=gitpull:main",
+            "puller=puller:main",
         ],
     },
 )

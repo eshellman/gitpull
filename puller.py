@@ -29,7 +29,7 @@ import sys
 logging.basicConfig(filename='puller.log', level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-from .gitpull import update_folder
+from gitpull import update_folder
 
 PUBLIC  = os.getenv ('PUBLIC')  or ''
 
