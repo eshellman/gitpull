@@ -65,7 +65,7 @@ def scan_dopull_log():
             target_path = os.path.join(FILES, str(ebook_num))
             logging.info(f'origin: {origin}, target_path: {target_path}')
             if os.path.exists(target_path) and current_user_id != os.stat(target_path).st_uid:
-                logging.error(f'failed to update {ebook_num} because owner id does not match')
+                logging.error(f'failed to update {ebook_num} because file owner does not match')
                 continue
              
             if update_folder(origin, target_path):
