@@ -48,6 +48,7 @@ def scan_dopull_log():
     """ 
     Scan the dopull log directory for new files.
     """
+    current_user_id = os.getuid()
 
     for filename in sorted(os.listdir(DOPULL_LOG_DIR)):
         mode = os.stat(os.path.join(DOPULL_LOG_DIR, filename))[stat.ST_MODE]
@@ -62,7 +63,11 @@ def scan_dopull_log():
             logging.info(ebook_num)
             origin = f'{UPSTREAM_REPO_DIR}{ebook_num}.git/'
             target_path = os.path.join(FILES, str(ebook_num))
-            logging.info(origin,target_path)
+            logging.info(f'origin: {origin}, target_path: {target_path}')
+            if os.path.exists(target_path) and current_user_id != os.stat(target_path).st_uid:
+                logging.error(f'failed to update {ebook_num} because owner id does not match')
+                continue
+             
             if update_folder(origin, target_path):
                 shutil.move(os.path.join(DOPULL_LOG_DIR, filename),
                              os.path.join(DOPUSH_LOG_DIR, filename))
