@@ -41,7 +41,6 @@ UPSTREAM_REPO_DIR = os.getenv('UPSTREAM_REPO_DIR') or 'https://github.com/gutenb
 
 # These are where .zip.trig files go on ibiblio :
 DOPULL_LOG_DIR = os.path.join(PRIVATE, 'logs', 'dopull')
-DOPULL_BACKUP_DIR = os.path.join(PRIVATE, 'logs', 'dopull', 'backup')
 DOPUSH_LOG_DIR = os.path.join(PRIVATE, 'logs', 'dopush')
 
 
@@ -65,14 +64,6 @@ def scan_dopull_log():
             origin = f'{UPSTREAM_REPO_DIR}{ebook_num}.git/'
             target_path = os.path.join(FILES, str(ebook_num))
             logging.info(f'origin: {origin}, target_path: {target_path}')
-            # resolve symlinks
-            target_path = os.path.realpath(target_path)
-
-            # check owner. It really needs to be the same as the user running this script
-            # because git gets nervous if the repo is owned by someone else.
-            # it should only be a different user if it hasn't been converted to git control
-            if os.path.exists(target_path) and current_user_id != os.stat(target_path).st_uid:
-                shutil.move(target_path, DOPULL_BACKUP_DIR)
              
             if update_folder(origin, target_path):
                 shutil.move(os.path.join(DOPULL_LOG_DIR, filename),

@@ -42,15 +42,31 @@ or
 puller
 ```
 
-### Arguments
+### Arguments and Configuration
 
-for gitpull
+gitpull
 
 - `repository_url`: Number of the eBook Git repository to clone/pull from (e.g., `12345`)
 - `target_path`: The local path _containing_ the eBook folder where the repository should be cloned or updated (e.g., `servername/1/2/3/4`, to update `servername/1/2/3/4/12345`)
 
 puller 
-has no arguments
+- has no arguments
+- Reads three variables from its environment: PUBLIC, PRIVATE and UPSTREAM_REPO_DIR, which it uses to form a repository url and a target path for gitpull
+- the default for PRIVATE is '' and for UPSTREAM_REPO_DIR is 'https://github.com/gutenbergbooks/' (which is used for testing)
+- puller looks for 'trig' files named NNNNN.zip.trig in $PRIVATE/logs/dopull', extracts NNNNN and uses that as the git repository number for gitpull. The trig file is then moved to the $PRIVATE/logs/dopush directory, which is how indexing and ebook builds are triggered.
+- these directories should be created if they do not exist. The target directories need to be writable by the user.
+
+if the target directories are not owned by the user who runs the gitpull or puller, the directories must be configured as "safe" with the command 
+
+`git config --global safe.directory '/path/to/directory/*'`
+
+or for older versions of git:
+
+`git config --global safe.directory '*'`
+
+
+git worries about this to protect a user from having code deployed by an unauthorized user. (It is not sufficient to for the user to have group writing privileges.)
+
 
 ### Options
 
@@ -61,19 +77,18 @@ for gitpull:
 
 ### Examples for gitpull
 
-Clone a new repository:
+Clone a new repository or update an existing repository:
 
 ```bash
 python3 gitpull.py 12345 /path/to/target
 ```
 
-Update an existing repository:
+or 
+`pipenv run gitpull 12345 /path/to/target`
 
-```bash
-python3 gitpull.py 12345 /path/to/target
-```
 
-## Behavior
+
+## Behavior of gitpull
 
 - **The files will be pulled to a folder named with the eBook number in the target folder**: This prevents pulling to a folder that does not match the eBook number
 - **If the target folder doesn't exist**: The application will exit
