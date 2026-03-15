@@ -13,6 +13,8 @@ import sys
 import logging
 from pathlib import Path
 
+UPSTREAM_REPO_DIR = os.getenv('UPSTREAM_REPO_DIR') or 'https://github.com/gutenbergbooks/'
+
 # Configure logging
 logging.basicConfig(filename='gitpull.log', level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -223,6 +225,11 @@ def main():
         action="store_true",
         help="Do not keep Git history"
     )
+    parser.add_argument(
+        "--createdirs",
+        action="store_true",
+        help="Create target directories if they don't exist"
+    )
 
     args = parser.parse_args()
 
@@ -233,17 +240,30 @@ def main():
     # Check if target exists and is a directory
     target_path = Path(args.target_path).resolve()
     if not target_path.exists() or not target_path.is_dir():
-        logger.error(f"{args.target_path} does not exist or is not a directory")
-        sys.exit(1)
+        if args.createdirs:
+            # Create the target directory if it doesn't exist
+            logger.info(f"Creating target directory: {target_path}")
+            try:
+                target_path.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                logger.error(f"Failed to create target directory: {e}")
+                print(f"Failed: unable to create target directory {target_path}, see log.")
+                sys.exit(1)
+        else:
+            logger.error(f"{args.target_path} does not exist or is not a directory")
+            print(f"Failed: {args.target_path} does not exist or is not a directory")
+            sys.exit(1)
 
     # Update the directory
-    origin = f"https://r.pglaf.org/git/{args.ebook_number}.git/"
+    origin = f"{UPSTREAM_REPO_DIR}{args.ebook_number}.git/"
 
     # destination is a directory named with the ebook number under the target path
     destination = f"{args.target_path}/{args.ebook_number}"
     logger.info(f"Pulling from {origin} to {destination}")
 
     success = update_folder(origin, destination)
+    # Remove Git history if not needed, but only if the update was successful to avoid
+    # deleting existing files on failure
     if args.norepo and success:
         success = remove_git_history(destination)
 
