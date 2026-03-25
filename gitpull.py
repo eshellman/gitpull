@@ -14,7 +14,33 @@ import logging
 from pathlib import Path
 import shutil
 
-VERSION = "2026.03.16"
+VERSION = "2026.03.25"
+
+def load_env_file(filepath=".env"):
+    """
+    Reads an .env file and sets environment variables.
+    Expected format:    THEKEY=the_value
+    """
+    if not os.path.exists(filepath):
+        # User could set them manually...
+        return
+
+    with open(filepath, "r") as file:
+        for line in file:
+            line = line.strip()
+            # Skip empty lines, comments, invalid lines
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            # Strip blanks & quotes
+            value = value.strip().strip('\'\"')
+            os.environ[key] = value
+
+
+# Load the variables from the.env file
+load_env_file()
+
 UPSTREAM_REPO_DIR = os.getenv('UPSTREAM_REPO_DIR') or ''
 
 # Configure logging
@@ -185,7 +211,7 @@ def remove_git_history(target_path):
     """
     Remove Git history from the target path.
     Deletes the .git directory and common Git-related files like .gitignore, .gitattributes,
-      README.md, and LICENSE.txt if they exist.
+      if they exist.
     It might be cleaner to use "git archive" to export only the files without Git history,
       but our server does not support the protocol. Would also need to remove untracked files.
       Any existing unchanged files should not be updated.
@@ -196,7 +222,7 @@ def remove_git_history(target_path):
         logger.info("Git history removed successfully")
     else:
         logger.info("No Git history found to remove")
-    files_to_remove = [".gitignore", ".gitattributes", "README.md", "LICENSE.txt"]
+    files_to_remove = [".gitignore", ".gitattributes"]
     for filename in files_to_remove:
         file_path = Path(target_path) / filename
         if file_path.exists():
