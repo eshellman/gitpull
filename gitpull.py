@@ -281,6 +281,16 @@ def main():
         print("Failed: UPSTREAM_REPO_DIR environment variable is not set.")
         sys.exit(1)
 
+    # Get the source repository
+    origin = f"{UPSTREAM_REPO_DIR}/{args.ebook_number}.git"
+    # Check if the source repository exists by trying to get its remote URL
+    try:
+        run_command(["git", "ls-remote", origin], noerror=True)
+    except subprocess.CalledProcessError:
+        logger.error(f"Source repository {origin} does not exist or is not accessible")
+        print(f"Failed: source repository {origin} does not exist or is not accessible.")
+        sys.exit(1)
+
     # Check if target exists and is a directory
     target_path = Path(args.target_path).resolve()
     if not target_path.exists() or not target_path.is_dir():
@@ -298,14 +308,16 @@ def main():
             print(f"Failed: {args.target_path} does not exist or is not a directory")
             sys.exit(1)
 
-    # Update the directory
-    origin = f"{UPSTREAM_REPO_DIR}/{args.ebook_number}.git/"
-
-    # destination is a directory named with the ebook number under the target path
-    destination = f"{args.target_path}/{args.ebook_number}"
+    # Destination is a directory named with the ebook number under the target path
+    destination = Path(args.target_path).expanduser().resolve() / str(args.ebook_number)
     logger.info(f"Pulling from {origin} to {destination}")
 
-    success = update_folder(origin, destination)
+    try:
+        success = update_folder(origin, destination)
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Unexpected git operation failure: {e}")
+        success = False
+
     # Remove Git history if not needed, but only if the update was successful to avoid
     # deleting existing files on failure
     if args.norepo and success:
