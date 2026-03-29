@@ -1,0 +1,183 @@
+#!/usr/bin/env python3
+"""Process .txt/.json trigger files and run updatehosts.py for each eBook."""
+
+import atexit
+import datetime as dt
+import os
+from pathlib import Path
+import shutil
+import signal
+import subprocess
+import sys
+
+try:
+    import pwd
+except ImportError:
+    pwd = None
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+
+# Parent directory of where to look for files to push out.
+PUSHDIR = Path(os.getenv("PUSHDIR", "/home/push"))
+# Where to move files after uploading them.
+DONE = Path(os.getenv("DONE", str(SCRIPT_DIR / "DONE")))
+# Output file.
+OUTFILE = Path(os.getenv("OUTFILE", str((SCRIPT_DIR / ".." / "tmp" / str(os.getpid())).resolve())))
+# Last run log.
+LASTRUNFILE = Path(os.getenv("LASTRUNFILE", str(SCRIPT_DIR / "dopull-lastrun")))
+# Lock file to prevent multiple dopulls running at the same time.
+PULLRUNNING = Path(os.getenv("PULLRUNNING", str(SCRIPT_DIR / ".dopull-running")))
+# Trigger directory for JSON processing on ibiblio (kept for compatibility with shell config).
+IBIBLIO_JSON_DIR = Path(os.getenv("IBIBLIO_JSON_DIR", "/public/vhost/g/gutenberg/private/logs/json"))
+# Email address to send trouble reports to.
+BOSS = os.getenv("BOSS", "pterodactyl@fastmail.com")
+
+
+def get_file_owner(path: Path) -> str:
+    """Return the file owner name when available, otherwise fall back to the uid."""
+    stat_info = path.stat()
+    uid = stat_info.st_uid
+    if pwd is None:
+        return str(uid)
+
+    getpwuid = getattr(pwd, "getpwuid", None)
+    if getpwuid is None:
+        return str(uid)
+
+    return getpwuid(uid).pw_name
+
+
+def append_out(message: str) -> None:
+    """Append a line to the output file, creating parent folders as needed."""
+    OUTFILE.parent.mkdir(parents=True, exist_ok=True)
+    with OUTFILE.open("a", encoding="utf-8") as fh:
+        fh.write(f"{message}\n")
+
+
+def cleanup(*_args: object) -> None:
+    """Remove lock file on exit."""
+    try:
+        PULLRUNNING.unlink(missing_ok=True)
+    except Exception:
+        pass
+    print("cleanup called, lock removed")
+
+
+def notify_postponed_and_exit() -> None:
+    """Notify that another dopull is active and exit."""
+    print(f"dopull postponed at {dt.datetime.now().isoformat(sep=' ', timespec='seconds')}")
+    sys.exit(0)
+
+
+def acquire_lock() -> None:
+    """Acquire singleton lock for this process."""
+    if PULLRUNNING.exists():
+        notify_postponed_and_exit()
+
+    PULLRUNNING.write_text(f"{dt.datetime.now().isoformat()}\n", encoding="utf-8")
+    atexit.register(cleanup)
+    signal.signal(signal.SIGINT, cleanup)
+    signal.signal(signal.SIGTERM, cleanup)
+
+
+def run_updatehosts(book_number: str) -> int:
+    """Run updatehosts.py for a single eBook and append output to OUTFILE."""
+    cmd = [sys.executable, str(SCRIPT_DIR / "updatehosts.py"), book_number]
+    print(f"Running command: {' '.join(cmd)}")
+
+    with OUTFILE.open("a", encoding="utf-8") as fh:
+        fh.write(" ".join(cmd) + "\n")
+        proc = subprocess.run(
+            cmd,
+            cwd=str(SCRIPT_DIR),
+            stdout=fh,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+    return proc.returncode
+
+
+def main() -> int:
+    """
+    • For each trigger file found in "push" directory,
+        ◦ Get owner of file (user)
+        ◦ Call updatehosts.py to create/update book on hosts, and trigger ibiblio update.
+        ◦ If file is .json, trigger ebook indexing by copying it to the ibiblio JSON dir.
+        ◦ Move file to DONE archive
+        ◦ Send success/fail email to user
+    """
+
+    # Mark the start of this run and acquire lock.
+    LASTRUNFILE.write_text(f"{dt.datetime.now().isoformat()}\n", encoding="utf-8")
+    acquire_lock()
+
+    # Ensure DONE directory exists.
+    DONE.mkdir(parents=True, exist_ok=True)
+
+    # Find trigger files, both .txt and .json.
+    trig_files = sorted(PUSHDIR.glob("*.txt")) + sorted(PUSHDIR.glob("*.json"))
+    if not trig_files:
+        append_out("No trigger files found, exiting.")
+        return 0
+
+    bombed = False
+    for trigger_file in trig_files:
+        filename = trigger_file.name
+        append_out(f"Processing trigger file: {filename}")
+
+        # Get owner of file (user).
+        user = BOSS
+        try:
+            user = get_file_owner(trigger_file)
+            append_out(f"Owner of file: {user}")
+        except Exception as e:
+            append_out(f"Failed to get owner of file: {e}; falling back to {user}")
+
+        # Extract book number from filename (assuming format like "12345.txt" or "12345.json").
+        book_number = trigger_file.stem
+        if not book_number.isdigit():
+            append_out(f"Skipping invalid trigger file (non-numeric book number): {filename}")
+            bombed = True
+            continue
+
+        rc = run_updatehosts(book_number)
+        if rc != 0:
+            append_out(f"Got {rc} exit status, this file did not go!")
+            bombed = True
+            continue
+
+        append_out("Success!")
+        append_out("")
+
+        # If it's a .json file, also copy it to the ibiblio JSON dir to trigger ebook build and indexing.
+        if trigger_file.suffix.lower() == ".json":
+            try:
+                shutil.copy2(str(trigger_file), str(IBIBLIO_JSON_DIR / filename))
+                append_out(f"Copied {filename} to {IBIBLIO_JSON_DIR} to trigger ebook build and indexing.")
+            except Exception as e:
+                append_out(f"Failed to copy {filename} to {IBIBLIO_JSON_DIR}: {e}")
+                bombed = True
+                continue
+
+        # Move the trigger file to the DONE directory.
+        shutil.move(str(trigger_file), str(DONE / filename))
+
+        # Send email to user notifying of success/failure.
+        try:
+            with OUTFILE.open("r", encoding="utf-8") as fh:
+                log_content = fh.read()
+            subprocess.run(
+                ["mail", "-s", "dopull results", user],
+                input=log_content,
+                text=True,
+                check=False,
+            )
+        except Exception as e:
+            append_out(f"Failed to send email to {user}: {e}")
+
+    return 1 if bombed else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

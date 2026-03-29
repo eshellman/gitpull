@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 """
-from gutenbergtools/pglaf-gitpull: Update a folder with the latest files from a Git repository
-
-This tool clones or pulls the latest changes from a Git repository into a
-specified target folder.
+Update an eBook directory on the mirrors with the latest files from the Git repository
 """
 import argparse
 import os
