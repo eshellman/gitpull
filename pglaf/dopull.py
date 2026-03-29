@@ -21,14 +21,15 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 # Parent directory of where to look for files to push out.
 PUSHDIR = Path(os.getenv("PUSHDIR", "/home/push"))
 # Where to move files after uploading them.
-DONE = Path(os.getenv("DONE", str(SCRIPT_DIR / "DONE")))
+DONE = Path(os.getenv("DONE", "/home/DONE"))
 # Output file.
-OUTFILE = Path(os.getenv("OUTFILE", str((SCRIPT_DIR / ".." / "tmp" / str(os.getpid())).resolve())))
+OUTFILE = Path(os.getenv("OUTFILE", str((SCRIPT_DIR / "tmp" / str(os.getpid())).resolve())))
 # Last run log.
 LASTRUNFILE = Path(os.getenv("LASTRUNFILE", str(SCRIPT_DIR / "dopull-lastrun")))
 # Lock file to prevent multiple dopulls running at the same time.
 PULLRUNNING = Path(os.getenv("PULLRUNNING", str(SCRIPT_DIR / ".dopull-running")))
 # Trigger directory for JSON processing on ibiblio (kept for compatibility with shell config).
+IBIBLIO = "gutenberg.login.ibiblio.org"
 IBIBLIO_JSON_DIR = Path(os.getenv("IBIBLIO_JSON_DIR", "/public/vhost/g/gutenberg/private/logs/json"))
 # Email address to send trouble reports to.
 BOSS = os.getenv("BOSS", "pterodactyl@fastmail.com")
@@ -61,19 +62,14 @@ def cleanup(*_args: object) -> None:
         PULLRUNNING.unlink(missing_ok=True)
     except Exception:
         pass
-    print("cleanup called, lock removed")
-
-
-def notify_postponed_and_exit() -> None:
-    """Notify that another dopull is active and exit."""
-    print(f"dopull postponed at {dt.datetime.now().isoformat(sep=' ', timespec='seconds')}")
-    sys.exit(0)
 
 
 def acquire_lock() -> None:
     """Acquire singleton lock for this process."""
     if PULLRUNNING.exists():
-        notify_postponed_and_exit()
+        # Notify that another dopull is active and exit.
+        print(f"dopull postponed at {dt.datetime.now().isoformat(sep=' ', timespec='seconds')}")
+        sys.exit(0)
 
     PULLRUNNING.write_text(f"{dt.datetime.now().isoformat()}\n", encoding="utf-8")
     atexit.register(cleanup)
@@ -96,7 +92,6 @@ def run_updatehosts(book_number: str) -> int:
             check=False,
         )
     return proc.returncode
-
 
 def main() -> int:
     """
@@ -124,7 +119,7 @@ def main() -> int:
     bombed = False
     for trigger_file in trig_files:
         filename = trigger_file.name
-        append_out(f"Processing trigger file: {filename}")
+        append_out(f"Processing file: {filename}")
 
         # Get owner of file (user).
         user = BOSS
@@ -150,17 +145,23 @@ def main() -> int:
         append_out("Success!")
         append_out("")
 
-        # If it's a .json file, also copy it to the ibiblio JSON dir to trigger ebook build and indexing.
+        # If it's a .json file, also copy it to the ibiblio JSON dir to trigger ebook indexing.
         if trigger_file.suffix.lower() == ".json":
             try:
-                shutil.copy2(str(trigger_file), str(IBIBLIO_JSON_DIR / filename))
-                append_out(f"Copied {filename} to {IBIBLIO_JSON_DIR} to trigger ebook build and indexing.")
+                dest = f"{IBIBLIO}:{IBIBLIO_JSON_DIR}/{filename}"
+                subprocess.run(
+                    ["scp", str(trigger_file), dest],
+                    check=True,
+                )
+                append_out(f"Copied {filename} to {dest} to trigger ebook indexing.")
             except Exception as e:
                 append_out(f"Failed to copy {filename} to {IBIBLIO_JSON_DIR}: {e}")
                 bombed = True
                 continue
 
         # Move the trigger file to the DONE directory.
+        print(f"Moving {filename} to DONE directory")
+        #os.chmod(trigger_file, 0o644)  # Ensure we have permission to move the file.
         shutil.move(str(trigger_file), str(DONE / filename))
 
         # Send email to user notifying of success/failure.
