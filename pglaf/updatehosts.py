@@ -8,7 +8,7 @@ import subprocess
 import logging
 import sys
 
-VERSION = "2026.03.26"
+VERSION = "2026.03.29"
 
 def load_env_file(filepath=".env"):
     """
@@ -65,7 +65,7 @@ def run_python_script_via_ssh(host, script_path, script_args=None, timeout=60):
     remote_command = f"python3 {script_path}"
     try:
         logger.info(f"[START] Running Python script on {host}: {remote_command} {' '.join(script_args)}")
-        output = run_ssh_command(host, remote_command, arguments=script_args, timeout=timeout)
+        output = run_ssh_command(host, remote_command, arguments=script_args, timeout=600)
         logger.info(f"[SUCCESS] Output from {host}: {output}")
         return output
     except Exception as e:
