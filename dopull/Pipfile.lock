@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "3df77eb035468f1e561c416cd7cc45195b84dbd2f4ca468ee4426f9b90f8ff1d"
+            "sha256": "702ad05de9bc9de99a4807c8dde1686f31e0041d7b5f6f6b74861195a52110f5"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -15,11 +15,6 @@
             }
         ]
     },
-    "default": {
-        "gitpull": {
-            "editable": true,
-            "file": "."
-        }
-    },
+    "default": {},
     "develop": {}
 }
