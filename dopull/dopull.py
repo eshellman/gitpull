@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+#-*- coding: utf-8 -*-
 """Process .txt/.json trigger files and run updatehosts.py for each eBook."""
 
 import atexit
@@ -16,7 +17,7 @@ try:
 except ImportError:
     pwd = None
 
-VERSION = "2026.03.30"
+VERSION = "2026.03.31"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -27,10 +28,10 @@ DONE = Path(os.getenv("DONE", "/home/DONE"))
 # Output file.
 OUTFILE = Path(os.getenv("OUTFILE", str(Path("/tmp") / str(os.getpid()))))
 # Last run log.
-LASTRUNFILE = Path(os.getenv("LASTRUNFILE", "/home/gbnewby/logs/dopull-lastrun"))
+LASTRUNFILE = Path(os.getenv("LASTRUNFILE", "/home/htdocs/dopull/logs/lastrun.txt"))
+LOGFILE = Path(os.getenv("LOGFILE", "/home/htdocs/dopull/logs/dopull.log"))
 # Lock file to prevent multiple dopulls running at the same time.
-LOGFILE = Path(os.getenv("LOGFILE", "/home/gbnewby/logs/dopull-log.txt"))
-PULLRUNNING = Path(os.getenv("PULLRUNNING", str(SCRIPT_DIR / ".dopull-running")))
+PULLRUNNING = Path(os.getenv("PULLRUNNING", str(SCRIPT_DIR / "/home/htdocs/dopull/.dopull-running")))
 # Trigger directory for JSON processing on ibiblio (kept for compatibility with shell config).
 IBIBLIO = "gutenberg.login.ibiblio.org"
 IBIBLIO_JSON_DIR = Path(os.getenv("IBIBLIO_JSON_DIR", "/public/vhost/g/gutenberg/private/logs/json"))
